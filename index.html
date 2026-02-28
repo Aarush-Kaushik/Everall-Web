@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Everall — Your Complete Life OS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <!-- QR Code library (requires internet; gracefully degrades offline) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+  <!-- Chart.js for analytics (requires internet; falls back to text stats offline) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js" defer></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="theme-dark">
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!--  TOP BAR                                        -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <header id="topbar">
+    <div id="topbar-left">
+      <button id="sidebar-toggle" title="Toggle Sidebar">☰</button>
+      <span id="app-logo">EVERALL</span>
+    </div>
+    <div id="topbar-center">
+      <span id="topbar-title">Dashboard</span>
+    </div>
+    <div id="topbar-right">
+      <span id="topbar-clock"></span>
+      <button id="theme-toggle" title="Toggle theme">◐</button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!--  SIDEBAR                                        -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <aside id="sidebar">
+    <nav id="nav-list">
+      <!-- dynamically populated by JS -->
+    </nav>
+    <div id="sidebar-profile"></div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!--  MAIN PANEL                                     -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <main id="main-panel">
+    <div id="module-container"></div>
+  </main>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!--  GLOBAL MODAL                                   -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div id="modal-overlay" class="hidden">
+    <div id="modal-box">
+      <button id="modal-close">✕</button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

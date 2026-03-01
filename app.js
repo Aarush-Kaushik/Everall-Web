@@ -403,12 +403,8 @@ const DashboardModule = {
         <div class="dash-card-icon">📍</div><div class="dash-card-val">${Storage.load('waypoints', []).length}</div><div class="dash-card-label">Saved Places</div>
       </div>
     </div>
-    <div class="card" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;margin:24px auto 24px auto;padding:20px;">
-      <div class="card-title" style="color:#fff;margin-bottom:16px;">🎉 Get the Everall Desktop App</div>
-      <div class="text-muted" style="color:rgba(255,255,255,0.9);margin-bottom:20px;">Take Everall with you everywhere. Download the official desktop application and boost your productivity on the go.</div>
-      <a href="https://github.com/Aarush-Kaushik/Everall/releases/download/v1.0.0/Everall.Setup.1.0.0.exe" class="btn btn-primary" style="background:#fff;color:#667eea;font-weight:bold;" download>⬇ Download Desktop App</a>
-    </div>  
     <div class="section-title">Quick Access</div>
+    
     <div class="quick-action-grid">
       ${modulesToDisplay.map(m => `
         <div class="action-tile" onclick="app.navigate('${m.id}')">
@@ -417,7 +413,13 @@ const DashboardModule = {
           <div class="action-tile-desc">Open ${m.label} Module</div>
         </div>
       `).join('')}
+    </div>
+    <div class="card" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;margin:24px auto 24px auto;padding:20px;">
+      <div class="card-title" style="color:#fff;margin-bottom:16px;">🎉 Get the Everall Desktop App</div>
+      <div class="text-muted" style="color:rgba(255,255,255,0.9);margin-bottom:20px;">Take Everall with you everywhere. Download the official desktop application and boost your productivity on the go.</div>
+      <a href="https://github.com/Aarush-Kaushik/Everall/releases/download/v1.0.0/Everall.Setup.1.0.0.exe" class="btn btn-primary" style="background:#fff;color:#667eea;font-weight:bold;" download>⬇ Download Desktop App</a>
     </div>`;
+    
   },
   init() {}
 };

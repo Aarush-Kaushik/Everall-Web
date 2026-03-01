@@ -56,29 +56,37 @@ function closeModal() {
 // ══════════════════════════════════════════════════
 const NAV = [
   { section: 'Overview' },
-  { id: 'dashboard',    label: 'Dashboard',     icon: '⬡' },
-  { id: 'analytics',    label: 'Analytics',     icon: '📊' },
+  { id: 'dashboard',    label: 'Dashboard',     icon: '⬡',  key: 'D' },
+  { id: 'analytics',    label: 'Analytics',     icon: '📊', key: 'Y' },
   { section: 'Time' },
-  { id: 'clock',        label: 'Clock & Timers', icon: '⏰' },
+  { id: 'clock',        label: 'Clock & Timers', icon: '⏰', key: 'C' },
   { section: 'Productivity' },
-  { id: 'todo',         label: 'To-Do List',    icon: '✅' },
-  { id: 'habits',       label: 'Habits',        icon: '🔥' },
-  { id: 'goals',        label: 'Goals',         icon: '🎯' },
-  { id: 'wishlist',     label: 'Wishlist',      icon: '⭐' },
-  { id: 'notes',        label: 'Notes',         icon: '📝' },
+  { id: 'todo',         label: 'To-Do List',    icon: '✅', key: 'T' },
+  { id: 'habits',       label: 'Habits',        icon: '🔥', key: 'H' },
+  { id: 'goals',        label: 'Goals',         icon: '🎯', key: 'G' },
+  { id: 'wishlist',     label: 'Wishlist',      icon: '⭐', key: 'W' },
+  { id: 'notes',        label: 'Notes',         icon: '📝', key: 'N' },
+  { id: 'weeklyreview', label: 'Weekly Review', icon: '📋', key: 'R' },
   { section: 'Planning' },
-  { id: 'calendar',     label: 'Calendar',      icon: '📅' },
-  { id: 'study',        label: 'Study Planner', icon: '📚' },
+  { id: 'calendar',     label: 'Calendar',      icon: '📅', key: 'L' },
+  { id: 'study',        label: 'Study Planner', icon: '📚', key: 'S' },
+  { id: 'mealplanner',  label: 'Meal Planner',  icon: '🍽️', key: 'M' },
   { section: 'Finance' },
-  { id: 'finance',      label: 'Finance',       icon: '💰' },
+  { id: 'finance',      label: 'Finance',       icon: '💰', key: 'F' },
   { section: 'Health' },
-  { id: 'health',       label: 'Health',        icon: '💪' },
+  { id: 'health',       label: 'Health',        icon: '💪', key: 'E' },
   { section: 'Fun' },
-  { id: 'games',        label: 'Games',         icon: '🎮' },
+  { id: 'games',        label: 'Games',         icon: '🎮', key: 'X' },
+  { id: 'dailychallenge', label: 'Daily Challenge', icon: '🎁', key: 'P' },
+  { section: 'People' },
+  { id: 'contacts',     label: 'Contacts',      icon: '👥', key: 'O' },
   { section: 'Tools' },
-  { id: 'utilities',    label: 'Utilities',     icon: '🔧' },
+  { id: 'utilities',    label: 'Utilities',     icon: '🔧', key: 'U' },
   { section: 'Misc' },
-  { id: 'settings',     label: 'Settings',      icon: '⚙️' },
+  { id: 'settings',     label: 'Settings',      icon: '⚙️', key: 'Z' },
+  { id: 'about',        label: 'About',         icon: 'ℹ️', key: 'I' },
+  { id: 'instructions', label: 'Instructions',  icon: '📖', key: 'V' },
+  { id: 'keybinds',     label: 'Keybinds',      icon: '⌨️', key: 'K' },
 ];
 
 // ══════════════════════════════════════════════════
@@ -97,6 +105,118 @@ class App {
     document.getElementById('modal-close').onclick = closeModal;
     document.getElementById('modal-overlay').addEventListener('click', e => { if(e.target.id==='modal-overlay') closeModal(); });
     document.getElementById('theme-toggle').onclick = () => this.cycleTheme();
+    this.bindKeyboardShortcuts();
+  }
+
+  bindKeyboardShortcuts() {
+    document.addEventListener('keydown', e => {
+      // Ctrl+K for search
+      if (e.ctrlKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        this.openGlobalSearch();
+        return;
+      }
+      // Single key navigation (only if not typing in input)
+      if (e.target.matches('input, textarea')) return;
+      const key = e.key.toUpperCase();
+      const item = NAV.find(n => n.key === key);
+      if (item && item.id) {
+        e.preventDefault();
+        this.navigate(item.id);
+      }
+    });
+  }
+
+  openGlobalSearch() {
+    let searchHtml = `
+      <div style="margin-bottom: 16px;">
+        <h3 style="margin-bottom: 8px;">🔍 Global Search</h3>
+        <input id="global-search-input" type="text" class="input" placeholder="Search modules, notes, tasks, contacts..." style="width: 100%;" autofocus>
+        <div style="font-size: 12px; color: var(--text2); margin-top: 6px;">Type to search • Press ESC to close</div>
+      </div>
+      <div id="search-results" style="max-height: 400px; overflow-y: auto;"></div>
+    `;
+    openModal(searchHtml);
+    const searchInput = document.getElementById('global-search-input');
+    if (searchInput) {
+      searchInput.addEventListener('input', () => this.performGlobalSearch());
+      searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeModal();
+      });
+    }
+  }
+
+  performGlobalSearch() {
+    const query = document.getElementById('global-search-input')?.value?.toLowerCase() || '';
+    const resultsEl = document.getElementById('search-results');
+    if (!query || query.length < 2) {
+      resultsEl.innerHTML = '';
+      return;
+    }
+    let results = [];
+    // Search modules
+    NAV.forEach(item => {
+      if (item.id && (item.label.toLowerCase().includes(query) || item.id.includes(query))) {
+        results.push({ type: 'module', label: item.label, id: item.id, icon: item.icon });
+      }
+    });
+    // Search notes
+    const notes = Storage.load('notes', []);
+    notes.forEach(note => {
+      if (note.title.toLowerCase().includes(query) || note.content.toLowerCase().includes(query)) {
+        results.push({ type: 'note', label: note.title || 'Untitled', id: note.id });
+      }
+    });
+    // Search todos
+    const todos = Storage.load('todos', []);
+    todos.forEach(todo => {
+      if (todo.text.toLowerCase().includes(query)) {
+        results.push({ type: 'todo', label: todo.text, id: todo.id });
+      }
+    });
+    // Search contacts
+    const contacts = Storage.load('contacts', []);
+    contacts.forEach(contact => {
+      if (contact.name.toLowerCase().includes(query) || contact.email.toLowerCase().includes(query) || contact.phone.includes(query)) {
+        results.push({ type: 'contact', label: contact.name, id: contact.id });
+      }
+    });
+    // Search goals
+    const goals = Storage.load('goals', []);
+    goals.forEach(goal => {
+      if (goal.title.toLowerCase().includes(query)) {
+        results.push({ type: 'goal', label: goal.title, id: goal.id });
+      }
+    });
+    if (results.length === 0) {
+      resultsEl.innerHTML = '<div class="text-muted text-sm">No results found</div>';
+      return;
+    }
+    resultsEl.innerHTML = results.slice(0, 20).map(r => `
+      <div class="list-item" style="cursor: pointer;" onclick="app.navigateSearchResult('${r.type}', '${r.id}')">
+        <span>${r.type === 'module' ? r.icon : r.type === 'note' ? '📝' : r.type === 'todo' ? '✅' : r.type === 'contact' ? '👥' : '🎯'}</span>
+        <div style="flex: 1; margin-left: 8px;">
+          <div style="font-weight: 600;">${escHtml(r.label)}</div>
+          <div style="font-size: 11px; color: var(--text2);">${r.type}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  navigateSearchResult(type, id) {
+    closeModal();
+    if (type === 'module') {
+      this.navigate(id);
+    } else if (type === 'note') {
+      this.navigate('notes');
+      setTimeout(() => NotesModule.openNote(id), 100);
+    } else if (type === 'todo') {
+      this.navigate('todo');
+    } else if (type === 'contact') {
+      this.navigate('contacts');
+    } else if (type === 'goal') {
+      this.navigate('goals');
+    }
   }
 
   buildSidebar() {
@@ -2359,7 +2479,7 @@ const SettingsModule = {
     </div>
     <div class="card">
       <div class="card-title">About Everall</div>
-      <div class="settings-row"><div class="settings-label">Version</div><span class="font-mono text-accent">1.0.6</span></div>
+      <div class="settings-row"><div class="settings-label">Version</div><span class="font-mono text-accent">1.1.0</span></div>
       <div class="settings-row"><div class="settings-label">Storage Used</div><span id="storage-size" class="font-mono">${this.storageSize()}</span></div>
       <div class="settings-row"><div class="settings-label">Mode</div><span class="badge badge-green">Fully Offline</span></div>
     </div>`;
@@ -2421,6 +2541,576 @@ const SettingsModule = {
 };
 
 // ══════════════════════════════════════════════════
+// MODULE: ABOUT
+// ══════════════════════════════════════════════════
+const AboutModule = {
+  render() {
+    return `
+    <div class="module-header"><div><div class="module-title">ℹ️ About Everall</div><div class="module-subtitle">Learn about this application</div></div></div>
+    <div class="card">
+      <div class="card-title">What is Everall?</div>
+      <p style="line-height: 1.8; color: var(--text2); margin-bottom: 16px;">
+        Everall is an all-in-one software and web application designed to bring multiple tools together in a single, seamless platform. With Everall, you can access productivity apps, planners, trackers, and entertainment tools all in one place, making your workflow smoother and more efficient than ever.
+      </p>
+      <p style="line-height: 1.8; color: var(--text2); margin-bottom: 16px;">
+        Every feature has been thoughtfully designed to save you time and keep everything organized, right at your fingertips.
+      </p>
+    </div>
+    <div class="card">
+      <div class="card-title">About the Developer</div>
+      <p style="line-height: 1.8; color: var(--text2); margin-bottom: 8px;">
+        <strong>Developed by Aarush Kaushik</strong>
+      </p>
+      <p style="line-height: 1.8; color: var(--text2); margin-bottom: 16px;">
+        Everall combines functionality, modern design, and ease of use, giving you a truly unified experience that replaces juggling multiple programs with a single, powerful hub.
+      </p>
+    </div>
+    <div class="card">
+      <div class="card-title">Key Features</div>
+      <ul style="list-style: none; color: var(--text2);">
+        <li style="margin-bottom: 8px;">✓ Productivity apps and tools</li>
+        <li style="margin-bottom: 8px;">✓ Task management & habit tracking</li>
+        <li style="margin-bottom: 8px;">✓ Financial tracking</li>
+        <li style="margin-bottom: 8px;">✓ Health & wellness monitoring</li>
+        <li style="margin-bottom: 8px;">✓ Calendar & scheduling</li>
+        <li style="margin-bottom: 8px;">✓ Entertainment & games</li>
+        <li style="margin-bottom: 8px;">✓ Completely offline & private</li>
+        <li>✓ Beautiful modern interface</li>
+      </ul>
+    </div>`;
+  },
+  init() {}
+};
+
+// ══════════════════════════════════════════════════
+// MODULE: INSTRUCTIONS
+// ══════════════════════════════════════════════════
+const InstructionsModule = {
+  render() {
+    return `
+    <div class="module-header"><div><div class="module-title">📖 How to Use Everall</div><div class="module-subtitle">Quick guide to each module</div></div></div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+      <div class="card">
+        <div class="card-title">📊 Analytics</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">View your productivity metrics and track time spent on different modules. See your activity patterns to optimize your workflow.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">⏰ Clock & Timers</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Use stopwatch, countdown timer, Pomodoro technique, and alarms. Perfect for time management and focused work sessions.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">✅ To-Do List</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Add, organize, and check off tasks. Track your daily productivity and stay on top of your goals.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🔥 Habits</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Build good habits by tracking daily streaks. Watch your consistency grow and maintain motivation with visual progress.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🎯 Goals</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Set long-term goals and break them into actionable steps. Track progress and celebrate milestones as you achieve them.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">⭐ Wishlist</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Keep track of items and dreams you want. Organize by category and set priorities for future purchases.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">📝 Notes</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Write and organize your thoughts, ideas, and important information. Search and access your notes anytime offline.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">📅 Calendar</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Plan your month or year with events and important dates. See your schedule at a glance and never miss important days.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">📚 Study Planner</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Track study hours by subject and create an effective study schedule. Perfect for students and lifelong learners.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">💰 Finance</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Log income and expenses to manage your budget. Track spending trends and understand your financial health.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">💪 Health</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Track water intake, weight, exercise, and sleep. Build a comprehensive health profile and maintain wellness goals.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🎮 Games</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Take a break with built-in games like Tic-Tac-Toe. Have fun while staying within the app ecosystem.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🔧 Utilities</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Convert units, generate QR codes, and access other helpful tools. Designed to solve everyday problems quickly.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">⚙️ Settings</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Customize your experience with themes and accents. Backup and restore your data, manage preferences your way.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">👥 Contacts</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Build a personal address book with names, phone numbers, emails, and birthday reminders. Never lose important contact information.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🍽️ Meal Planner</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Plan your weekly breakfast, lunch, and dinner. Generate a grocery list automatically from your planned meals to simplify shopping, or manually if that's what you prefer.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">🎁 Daily Challenge</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Accept a new random challenge each day to build better habits. Track completed challenges and maintain your streak of daily accomplishments.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 Weekly Review</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Reflect on your week with guided prompts about accomplishments, focus, and habits. Review past reflections for continuous improvement.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">⌨️ Keybinds</div>
+        <p style="color: var(--text2); font-size: 13px; line-height: 1.6;">Master Everall's keyboard shortcuts to navigate Everall faster. Use Ctrl+K for global search or single keys to jump to any module instantly.</p>
+      </div>
+    </div>`;
+  },
+  init() {}
+};
+
+// ══════════════════════════════════════════════════
+// MODULE: CONTACTS
+// ══════════════════════════════════════════════════
+const ContactsModule = {
+  render() {
+    const contacts = Storage.load('contacts', []);
+    const sorted = contacts.sort((a, b) => a.name.localeCompare(b.name));
+    return `
+    <div class="module-header"><div><div class="module-title">👥 Contacts</div><div class="module-subtitle">Personal address book</div></div><button class="btn btn-primary" onclick="ContactsModule.newContact()">➕ Add Contact</button></div>
+    <div class="card-grid">
+      ${sorted.map(c => `
+        <div class="card" style="padding: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+            <div style="font-weight: 700; font-size: 15px;">${escHtml(c.name)}</div>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-ghost btn-sm" onclick="ContactsModule.editContact('${c.id}')">✏️</button>
+              <button class="btn btn-ghost btn-sm" onclick="ContactsModule.deleteContact('${c.id}')">🗑️</button>
+            </div>
+          </div>
+          ${c.phone ? `<div style="font-size: 12px; color: var(--text2); margin-bottom: 4px;">📱 ${escHtml(c.phone)}</div>` : ''}
+          ${c.email ? `<div style="font-size: 12px; color: var(--text2); margin-bottom: 4px;">✉️ ${escHtml(c.email)}</div>` : ''}
+          ${c.birthday ? `<div style="font-size: 12px; color: var(--accent); margin-bottom: 4px;">🎂 ${c.birthday}</div>` : ''}
+        </div>
+      `).join('')}
+    </div>`;
+  },
+  newContact() {
+    openModal(`
+      <div style="margin-bottom: 16px;"><h3>New Contact</h3></div>
+      <div class="form-group">
+        <label class="form-label">Name *</label>
+        <input id="contact-name" type="text" class="input" placeholder="Full name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone</label>
+        <input id="contact-phone" type="tel" class="input" placeholder="Phone number">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input id="contact-email" type="email" class="input" placeholder="Email address">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Birthday</label>
+        <input id="contact-birthday" type="date" class="input">
+      </div>
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="ContactsModule.saveContact()">Save</button>
+      </div>
+    `);
+  },
+  saveContact() {
+    const name = document.getElementById('contact-name')?.value?.trim();
+    if (!name) { showToast('Name is required', 'error'); return; }
+    const contacts = Storage.load('contacts', []);
+    contacts.push({
+      id: uid(),
+      name,
+      phone: document.getElementById('contact-phone')?.value || '',
+      email: document.getElementById('contact-email')?.value || '',
+      birthday: document.getElementById('contact-birthday')?.value || ''
+    });
+    Storage.save('contacts', contacts);
+    closeModal();
+    app.navigate('contacts');
+    showToast('Contact added', 'success');
+  },
+  editContact(id) {
+    const contacts = Storage.load('contacts', []);
+    const c = contacts.find(x => x.id === id);
+    if (!c) return;
+    openModal(`
+      <div style="margin-bottom: 16px;"><h3>Edit Contact</h3></div>
+      <div class="form-group">
+        <label class="form-label">Name *</label>
+        <input id="contact-name" type="text" class="input" value="${escHtml(c.name)}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone</label>
+        <input id="contact-phone" type="tel" class="input" value="${escHtml(c.phone || '')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input id="contact-email" type="email" class="input" value="${escHtml(c.email || '')}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Birthday</label>
+        <input id="contact-birthday" type="date" class="input" value="${c.birthday || ''}">
+      </div>
+      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="ContactsModule.updateContact('${id}')">Update</button>
+      </div>
+    `);
+  },
+  updateContact(id) {
+    const name = document.getElementById('contact-name')?.value?.trim();
+    if (!name) { showToast('Name is required', 'error'); return; }
+    const contacts = Storage.load('contacts', []);
+    const idx = contacts.findIndex(x => x.id === id);
+    if (idx >= 0) {
+      contacts[idx] = {
+        id,
+        name,
+        phone: document.getElementById('contact-phone')?.value || '',
+        email: document.getElementById('contact-email')?.value || '',
+        birthday: document.getElementById('contact-birthday')?.value || ''
+      };
+      Storage.save('contacts', contacts);
+      closeModal();
+      app.navigate('contacts');
+      showToast('Contact updated', 'success');
+    }
+  },
+  deleteContact(id) {
+    if (confirm('Delete this contact?')) {
+      let contacts = Storage.load('contacts', []);
+      contacts = contacts.filter(x => x.id !== id);
+      Storage.save('contacts', contacts);
+      app.navigate('contacts');
+      showToast('Contact deleted', 'success');
+    }
+  },
+  init() {}
+};
+
+// ══════════════════════════════════════════════════
+// MODULE: MEAL PLANNER
+// ══════════════════════════════════════════════════
+const MealPlannerModule = {
+  _currentWeek: 0,
+  _days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+  render() {
+    const meals = Storage.load('meals', {});
+    const grocery = Storage.load('grocery_list', []);
+    return `
+    <div class="module-header"><div><div class="module-title">🍽️ Meal Planner</div><div class="module-subtitle">Plan your weekly meals</div></div><button class="btn btn-primary" onclick="MealPlannerModule.generateGroceryList()">🛒 Generate Grocery List</button></div>
+    <div class="card">
+      <div class="card-title">Weekly Meal Plan</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+        ${this._days.map((day, i) => `
+          <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">
+            <div style="font-weight: 600; margin-bottom: 8px;">${day}</div>
+            <div style="font-size: 12px; margin-bottom: 6px;">Breakfast</div>
+            <input type="text" class="input" id="meal-breakfast-${i}" placeholder="Add breakfast" style="font-size: 12px; margin-bottom: 8px;">
+            <div style="font-size: 12px; margin-bottom: 6px;">Lunch</div>
+            <input type="text" class="input" id="meal-lunch-${i}" placeholder="Add lunch" style="font-size: 12px; margin-bottom: 8px;">
+            <div style="font-size: 12px; margin-bottom: 6px;">Dinner</div>
+            <input type="text" class="input" id="meal-dinner-${i}" placeholder="Add dinner" style="font-size: 12px; margin-bottom: 8px;">
+          </div>
+        `).join('')}
+      </div>
+      <button class="btn btn-primary" style="margin-top: 16px;" onclick="MealPlannerModule.saveMealPlan()">💾 Save Meal Plan</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Grocery List</div>
+      <div class="input-group">
+        <input id="grocery-item" type="text" class="input" placeholder="Add item...">
+        <button class="btn btn-primary" onclick="MealPlannerModule.addGroceryItem()">Add</button>
+      </div>
+      <div class="item-list" style="margin-top: 12px;">
+        ${grocery.map(item => `
+          <div class="list-item">
+            <div class="flex gap-8" style="flex: 1;">
+              <span>${escHtml(item)}</span>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="MealPlannerModule.removeGroceryItem('${escHtml(item)}')">✕</button>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+  },
+  saveMealPlan() {
+    const meals = {};
+    for (let i = 0; i < 7; i++) {
+      meals[this._days[i]] = {
+        breakfast: document.getElementById(`meal-breakfast-${i}`)?.value || '',
+        lunch: document.getElementById(`meal-lunch-${i}`)?.value || '',
+        dinner: document.getElementById(`meal-dinner-${i}`)?.value || ''
+      };
+    }
+    Storage.save('meals', meals);
+    showToast('Meal plan saved', 'success');
+  },
+  addGroceryItem() {
+    const item = document.getElementById('grocery-item')?.value?.trim();
+    if (!item) return;
+    let grocery = Storage.load('grocery_list', []);
+    if (!grocery.includes(item)) {
+      grocery.push(item);
+      Storage.save('grocery_list', grocery);
+      document.getElementById('grocery-item').value = '';
+      app.navigate('mealplanner');
+      showToast('Item added', 'success');
+    }
+  },
+  removeGroceryItem(item) {
+    let grocery = Storage.load('grocery_list', []);
+    grocery = grocery.filter(x => x !== item);
+    Storage.save('grocery_list', grocery);
+    app.navigate('mealplanner');
+  },
+  generateGroceryList() {
+    const meals = Storage.load('meals', {});
+    let grocery = [];
+    let added = 0;
+    for (const day in meals) {
+      const dayMeals = meals[day];
+      [dayMeals.breakfast, dayMeals.lunch, dayMeals.dinner].forEach(meal => {
+        if (meal?.trim() && !grocery.includes(meal.trim())) {
+          grocery.push(meal.trim());
+          added++;
+        }
+      });
+    }
+    if (added === 0) { showToast('No items to add', 'error'); return; }
+    Storage.save('grocery_list', grocery);
+    showToast(`Generated ${added} items from meal plan`, 'success');
+    app.navigate('mealplanner');
+  },
+  populateSavedMeals() {
+    const meals = Storage.load('meals', {});
+    for (let i = 0; i < 7; i++) {
+      const dayMeals = meals[this._days[i]];
+      if (dayMeals) {
+        const breakfastEl = document.getElementById(`meal-breakfast-${i}`);
+        const lunchEl = document.getElementById(`meal-lunch-${i}`);
+        const dinnerEl = document.getElementById(`meal-dinner-${i}`);
+        if (breakfastEl) breakfastEl.value = dayMeals.breakfast || '';
+        if (lunchEl) lunchEl.value = dayMeals.lunch || '';
+        if (dinnerEl) dinnerEl.value = dayMeals.dinner || '';
+      }
+    }
+  },
+  init() {
+    this.populateSavedMeals();
+  }
+};
+
+// ══════════════════════════════════════════════════
+// MODULE: DAILY CHALLENGE
+// ══════════════════════════════════════════════════
+const DailyChallengeModule = {
+  _challenges: [
+    'Drink 3L of water throughout the day',
+    'Take a 10-minute walk',
+    'Write 200 words freely',
+    'Do 20 push-ups',
+    'Meditate for 10 minutes',
+    'Read 20 pages of a book',
+    'Call a friend or family member',
+    'Practice a hobby for 30 minutes',
+    'Do 50 jumping jacks',
+    'Write down 3 things you\'re grateful for',
+    'Stretch for 15 minutes',
+    'Learn something new for 10 minutes',
+    'Do 30 squats',
+    'Prepare a healthy meal',
+    'Organize one area of your room'
+  ],
+  render() {
+    const log = Storage.load('challenge_log', []);
+    const today_str = today();
+    const today_challenge = log.find(x => x.date === today_str);
+    const todayChallenge = this._challenges[new Date().getDate() % this._challenges.length];
+    return `
+    <div class="module-header"><div><div class="module-title">🎁 Daily Challenge</div><div class="module-subtitle">Complete a challenge today!</div></div></div>
+    <div class="card">
+      <div class="card-title">Today's Challenge</div>
+      <div style="background: var(--surface2); border: 2px solid var(--accent); border-radius: var(--radius); padding: 24px; text-align: center; margin-bottom: 16px;">
+        <div style="font-size: 32px; margin-bottom: 12px;">🎯</div>
+        <div style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">${todayChallenge}</div>
+        <button class="btn ${today_challenge?.completed ? 'btn-secondary' : 'btn-primary'}" onclick="DailyChallengeModule.completeChallenge()">
+          ${today_challenge?.completed ? '✅ Completed Today' : '▶ Mark as Complete'}
+        </button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Challenge History</div>
+      <div class="item-list">
+        ${log.slice().reverse().slice(0, 10).map(entry => `
+          <div class="list-item">
+            <span style="color: var(--text2);">${entry.date}</span>
+            <span style="flex: 1;"></span>
+            <span>${entry.completed ? '✅ Completed' : '⏸ Skipped'}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+  },
+  completeChallenge() {
+    const log = Storage.load('challenge_log', []);
+    const today_str = today();
+    let entry = log.find(x => x.date === today_str);
+    if (!entry) {
+      entry = { date: today_str, completed: false };
+      log.push(entry);
+    }
+    entry.completed = true;
+    Storage.save('challenge_log', log);
+    showToast('🎉 Challenge completed!', 'success');
+    app.navigate('dailychallenge');
+  },
+  init() {}
+};
+
+// ══════════════════════════════════════════════════
+// MODULE: WEEKLY REVIEW
+// ══════════════════════════════════════════════════
+const WeeklyReviewModule = {
+  render() {
+    const reviews = Storage.load('weekly_reviews', []);
+    const lastReview = reviews[reviews.length - 1];
+    return `
+    <div class="module-header"><div><div class="module-title">📋 Weekly Review</div><div class="module-subtitle">Reflect on your week every Sunday</div></div></div>
+    <div class="card">
+      <div class="card-title">This Week's Review</div>
+      <div class="form-group">
+        <label class="form-label">What did I accomplish this week?</label>
+        <textarea id="review-accomplish" class="input" placeholder="List your achievements..." style="min-height: 100px;"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">What's my focus for next week?</label>
+        <textarea id="review-focus" class="input" placeholder="What do you want to prioritize?..." style="min-height: 100px;"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">How are my habits doing?</label>
+        <textarea id="review-habits" class="input" placeholder="Reflect on your habits..." style="min-height: 100px;"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Any other notes?</label>
+        <textarea id="review-notes" class="input" placeholder="General reflections..." style="min-height: 100px;"></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="WeeklyReviewModule.saveReview()">💾 Save Review</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Past Reviews</div>
+      <div class="item-list">
+        ${reviews.slice().reverse().map((r, i) => `
+          <div class="list-item" style="flex-direction: column; align-items: flex-start; cursor: pointer;" onclick="WeeklyReviewModule.viewReview(${i})">
+            <div style="font-weight: 600;">${r.date || 'Review ' + (reviews.length - i)}</div>
+            <div style="font-size: 12px; color: var(--text2); margin-top: 4px;">${r.accomplish ? r.accomplish.substring(0, 60) + '...' : 'No content'}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+  },
+  saveReview() {
+    const accomplish = document.getElementById('review-accomplish')?.value?.trim();
+    const focus = document.getElementById('review-focus')?.value?.trim();
+    const habits = document.getElementById('review-habits')?.value?.trim();
+    const notes = document.getElementById('review-notes')?.value?.trim();
+    if (!accomplish && !focus && !habits && !notes) { showToast('Please write something', 'error'); return; }
+    let reviews = Storage.load('weekly_reviews', []);
+    reviews.push({
+      date: new Date().toLocaleDateString(),
+      accomplish,
+      focus,
+      habits,
+      notes
+    });
+    Storage.save('weekly_reviews', reviews);
+    showToast('Weekly review saved', 'success');
+    app.navigate('weeklyreview');
+  },
+  viewReview(idx) {
+    const reviews = Storage.load('weekly_reviews', []);
+    const r = reviews[reviews.length - 1 - idx];
+    if (!r) return;
+    openModal(`
+      <div style="margin-bottom: 16px;"><h3>Weekly Review</h3><p style="font-size: 13px; color: var(--text2);">${r.date}</p></div>
+      <div style="margin-bottom: 16px;">
+        <div style="font-weight: 600; margin-bottom: 6px;">Accomplishments</div>
+        <p style="color: var(--text2); line-height: 1.6;">${escHtml(r.accomplish || 'N/A')}</p>
+      </div>
+      <div style="margin-bottom: 16px;">
+        <div style="font-weight: 600; margin-bottom: 6px;">Next Week's Focus</div>
+        <p style="color: var(--text2); line-height: 1.6;">${escHtml(r.focus || 'N/A')}</p>
+      </div>
+      <div style="margin-bottom: 16px;">
+        <div style="font-weight: 600; margin-bottom: 6px;">Habits Update</div>
+        <p style="color: var(--text2); line-height: 1.6;">${escHtml(r.habits || 'N/A')}</p>
+      </div>
+      <div style="margin-bottom: 16px;">
+        <div style="font-weight: 600; margin-bottom: 6px;">Additional Notes</div>
+        <p style="color: var(--text2); line-height: 1.6;">${escHtml(r.notes || 'N/A')}</p>
+      </div>
+      <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+    `);
+  },
+  init() {}
+};
+
+// ══════════════════════════════════════════════════
+// MODULE: KEYBINDS
+// ══════════════════════════════════════════════════
+const KeybindsModule = {
+  render() {
+    const keybinds = NAV.filter(n => n.key).sort((a, b) => a.key.localeCompare(b.key));
+    return `
+    <div class="module-header"><div><div class="module-title">⌨️ Keyboard Shortcuts</div><div class="module-subtitle">Navigate Everall faster with keybinds</div></div></div>
+    <div class="card">
+      <div class="card-title">Global Shortcuts</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
+        <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">
+          <div style="font-weight: 600; margin-bottom: 6px;">🔍 Search Everything</div>
+          <div style="font-size: 13px; color: var(--text); font-family: var(--mono); background: var(--surface2); padding: 8px 12px; border-radius: var(--radius-sm); text-align: center; border: 1px solid var(--border); font-weight: 700; letter-spacing: 1px; margin-bottom: 8px;">Ctrl + K</div>
+          <div style="font-size: 12px; color: var(--text2);">Search across all modules, notes, tasks, and contacts</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Module Navigation Shortcuts</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
+        ${keybinds.map(kb => `
+          <div style="background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <span style="font-size: 18px;">${kb.icon}</span>
+              <div style="font-weight: 600;">${kb.label}</div>
+            </div>
+            <div style="font-size: 13px; color: var(--text); font-family: var(--mono); background: var(--surface2); padding: 8px 12px; border-radius: var(--radius-sm); text-align: center; border: 1px solid var(--border); font-weight: 700; letter-spacing: 1px;">${kb.key}</div>
+            <div style="font-size: 11px; color: var(--text2); margin-top: 6px;">Press '<strong>${kb.key}</strong>' to navigate</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">💡 Tips</div>
+      <ul style="list-style: none; color: var(--text2); font-size: 13px; line-height: 1.8;">
+        <li style="margin-bottom: 8px;">✓ Single key shortcuts work when not typing in input fields</li>
+        <li style="margin-bottom: 8px;">✓ Use Ctrl+K anytime to search across all your data</li>
+        <li style="margin-bottom: 8px;">✓ Search results include modules, notes, tasks, contacts, and goals</li>
+        <li>✓ Press ESC to close search or any modal</li>
+      </ul>
+    </div>`;
+  },
+  init() {}
+};
+
+// ══════════════════════════════════════════════════
 // MODULE REGISTRY
 // ══════════════════════════════════════════════════
 const Modules = {
@@ -2431,14 +3121,21 @@ const Modules = {
   goals:      GoalsModule,
   wishlist:   WishlistModule,
   notes:      NotesModule,
+  weeklyreview: WeeklyReviewModule,
   calendar:   CalendarModule,
   study:      StudyModule,
+  mealplanner: MealPlannerModule,
   finance:    FinanceModule,
   health:     HealthModule,
   games:      GamesModule,
+  dailychallenge: DailyChallengeModule,
+  contacts:   ContactsModule,
   analytics:  AnalyticsModule,
   utilities:  UtilitiesModule,
   settings:   SettingsModule,
+  about:      AboutModule,
+  instructions: InstructionsModule,
+  keybinds:   KeybindsModule,
 };
 
 // ══════════════════════════════════════════════════
@@ -2463,6 +3160,13 @@ document.addEventListener('DOMContentLoaded', () => {
   window.AnalyticsModule = AnalyticsModule;
   window.UtilitiesModule = UtilitiesModule;
   window.SettingsModule = SettingsModule;
+  window.AboutModule = AboutModule;
+  window.InstructionsModule = InstructionsModule;
+  window.ContactsModule = ContactsModule;
+  window.MealPlannerModule = MealPlannerModule;
+  window.DailyChallengeModule = DailyChallengeModule;
+  window.WeeklyReviewModule = WeeklyReviewModule;
+  window.KeybindsModule = KeybindsModule;
   window.showToast = showToast;
   window.closeModal = closeModal;
   window.openModal = openModal;

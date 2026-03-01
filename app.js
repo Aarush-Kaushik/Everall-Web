@@ -78,10 +78,16 @@ const NAV = [
   { section: 'Fun' },
   { id: 'games',        label: 'Games',         icon: '🎮', key: 'X' },
   { id: 'dailychallenge', label: 'Daily Challenge', icon: '🎁', key: 'P' },
+  { section: 'Media' },
+  { id: 'music',        label: 'Music Player',  icon: '🎵', key: 'Q' },
+  { id: 'video',        label: 'Video Player',  icon: '🎬', key: 'B' },
+  { id: 'maps',         label: 'Maps',          icon: '🗺️', key: 'O' },
   { section: 'People' },
-  { id: 'contacts',     label: 'Contacts',      icon: '👥', key: 'O' },
+  { id: 'contacts',     label: 'Contacts',      icon: '👥', key: 'P' },
   { section: 'Tools' },
   { id: 'utilities',    label: 'Utilities',     icon: '🔧', key: 'U' },
+  { id: 'clipboard',    label: 'Clipboard',     icon: '📋', key: 'J' },
+  { id: 'codeeditor',  label: 'Code Editor',   icon: '📄', key: 'A' },
   { section: 'Misc' },
   { id: 'settings',     label: 'Settings',      icon: '⚙️', key: 'Z' },
   { id: 'about',        label: 'About',         icon: 'ℹ️', key: 'I' },
@@ -96,12 +102,20 @@ class App {
   constructor() {
     this.currentModule = 'dashboard';
     this.clockInterval = null;
+    
+    // Split Screen State
+    this.splitMode = false;
+    this.activeSplit = 'left';
+    this.leftModule = 'dashboard';
+    this.rightModule = 'calendar'; // default right module
+
     this.buildSidebar();
     this.bindNav();
     this.navigate('dashboard');
     this.startTopClock();
     this.applySettings();
     document.getElementById('sidebar-toggle').onclick = () => this.toggleSidebar();
+    document.getElementById('split-toggle').onclick = () => this.toggleSplitMode();
     document.getElementById('modal-close').onclick = closeModal;
     document.getElementById('modal-overlay').addEventListener('click', e => { if(e.target.id==='modal-overlay') closeModal(); });
     document.getElementById('theme-toggle').onclick = () => this.cycleTheme();
@@ -131,17 +145,22 @@ class App {
     let searchHtml = `
       <div style="margin-bottom: 16px;">
         <h3 style="margin-bottom: 8px;">🔍 Global Search</h3>
-        <input id="global-search-input" type="text" class="input" placeholder="Search modules, notes, tasks, contacts..." style="width: 100%;" autofocus>
-        <div style="font-size: 12px; color: var(--text2); margin-top: 6px;">Type to search • Press ESC to close</div>
+        <input id="global-search-input" type="text" class="input" placeholder="Search modules, notes, tasks, contacts..." style="width: 100%;">
+        <div style="font-size: 12px; color: var(--text2); margin-top: 6px;">Type to search • Press ESC to close • Enter for first result</div>
       </div>
       <div id="search-results" style="max-height: 400px; overflow-y: auto;"></div>
     `;
     openModal(searchHtml);
     const searchInput = document.getElementById('global-search-input');
     if (searchInput) {
+      setTimeout(() => searchInput.focus(), 50);
       searchInput.addEventListener('input', () => this.performGlobalSearch());
       searchInput.addEventListener('keydown', e => {
         if (e.key === 'Escape') closeModal();
+        if (e.key === 'Enter') {
+          const first = document.querySelector('#search-results .list-item');
+          if (first) first.click();
+        }
       });
     }
   }
@@ -223,7 +242,12 @@ class App {
     const nav = document.getElementById('nav-list');
     nav.innerHTML = NAV.map(item => {
       if(item.section) return `<div class="nav-section-label">${item.section}</div>`;
-      return `<div class="nav-item" data-id="${item.id}"><span class="nav-icon">${item.icon}</span><span class="nav-label">${item.label}</span></div>`;
+      return `
+        <div class="nav-item" data-id="${item.id}">
+          <span class="nav-icon">${item.icon}</span>
+          <span class="nav-label">${item.label}</span>
+          ${item.key ? `<span class="nav-keybind">${item.key}</span>` : ''}
+        </div>`;
     }).join('');
   }
 
@@ -235,15 +259,91 @@ class App {
   }
 
   navigate(id) {
-    this.currentModule = id;
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.id === id));
-    const navItem = NAV.find(n => n.id === id);
-    document.getElementById('topbar-title').textContent = navItem?.label || id;
-    const container = document.getElementById('module-container');
-    container.innerHTML = '<div class="fade-in">' + (Modules[id]?.render() || '<p>Module not found</p>') + '</div>';
-    Modules[id]?.init?.();
+    if (this.splitMode) {
+      if ((this.activeSplit === 'left' && id === this.rightModule) || 
+          (this.activeSplit === 'right' && id === this.leftModule)) {
+        showToast('This module is already open in the other side!', 'warning');
+        return;
+      }
+      const side = this.activeSplit;
+      if (side === 'left') this.leftModule = id;
+      else this.rightModule = id;
+      
+      this.updateSplitSide(side, id);
+    } else {
+      this.currentModule = id;
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+      const navItem = NAV.find(n => n.id === id);
+      document.getElementById('topbar-title').textContent = navItem?.label || id;
+      const container = document.getElementById('module-container');
+      container.innerHTML = '<div class="fade-in">' + (Modules[id]?.render() || '<p>Module not found</p>') + '</div>';
+      Modules[id]?.init?.();
+    }
     // Track time spent
-    TimeModule.logModuleTime(id);
+    if (typeof TimeModule !== 'undefined') TimeModule.logModuleTime(id);
+  }
+
+  toggleSplitMode() {
+    this.splitMode = !this.splitMode;
+    const btn = document.getElementById('split-toggle');
+    const container = document.getElementById('module-container');
+    
+    btn.classList.toggle('active', this.splitMode);
+    container.classList.toggle('split-mode', this.splitMode);
+    
+    if (this.splitMode) {
+      this.leftModule = this.currentModule;
+      this.renderSplitMode(); // Full render on enter
+    } else {
+      container.innerHTML = '';
+      this.navigate(this.leftModule);
+    }
+    showToast(this.splitMode ? 'Split View Enabled' : 'Split View Disabled', 'info');
+  }
+
+  renderSplitMode() {
+    const container = document.getElementById('module-container');
+    container.innerHTML = `
+      <div id="split-left" class="split-column ${this.activeSplit === 'left' ? 'active' : ''}" data-side="Left" onclick="app.selectSplit('left')">
+        <div class="split-content">${Modules[this.leftModule]?.render() || '<p>Module not found</p>'}</div>
+      </div>
+      <div id="split-right" class="split-column ${this.activeSplit === 'right' ? 'active' : ''}" data-side="Right" onclick="app.selectSplit('right')">
+        <div class="split-content">${Modules[this.rightModule]?.render() || '<p>Module not found</p>'}</div>
+      </div>
+    `;
+    Modules[this.leftModule]?.init?.();
+    Modules[this.rightModule]?.init?.();
+    this.updateActiveNav();
+  }
+
+  updateSplitSide(side, id) {
+    const el = document.getElementById(`split-${side}`);
+    if (!el) return;
+    const content = el.querySelector('.split-content');
+    if (content) {
+      content.innerHTML = `<div class="fade-in">${Modules[id]?.render() || '<p>Module not found</p>'}</div>`;
+      Modules[id]?.init?.();
+    }
+    this.updateActiveNav();
+  }
+
+  updateActiveNav() {
+    const activeId = this.activeSplit === 'left' ? this.leftModule : this.rightModule;
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.id === activeId));
+    const navItem = NAV.find(n => n.id === activeId);
+    document.getElementById('topbar-title').textContent = 'Split View: ' + (navItem?.label || activeId);
+  }
+
+  selectSplit(side) {
+    if (this.activeSplit === side) return;
+    this.activeSplit = side;
+    
+    const left = document.getElementById('split-left');
+    const right = document.getElementById('split-right');
+    if (left) left.classList.toggle('active', side === 'left');
+    if (right) right.classList.toggle('active', side === 'right');
+    
+    this.updateActiveNav();
   }
 
   toggleSidebar() {
@@ -281,43 +381,189 @@ class App {
 const DashboardModule = {
   render() {
     const todos = Storage.load('todos', []);
-    const habits = Storage.load('habits', []);
-    const expenses = Storage.load('expenses', []);
-    const income = Storage.load('income', []);
     const notes = Storage.load('notes', []);
-    const completed = todos.filter(t => t.done).length;
-    const activeHabits = habits.filter(h => h.streak > 0).length;
-    const thisMonth = new Date().toISOString().slice(0,7);
-    const totalExp = expenses.filter(e=>e.date.startsWith(thisMonth)).reduce((s,e)=>s+e.amount,0);
-    const totalInc = income.filter(i=>i.date.startsWith(thisMonth)).reduce((s,i)=>s+i.amount,0);
     const now = new Date();
-    const greet = now.getHours()<12?'Good morning':'now.getHours()<17'?'Good afternoon':'Good evening';
-    const greetText = now.getHours()<12?'Good morning':now.getHours()<17?'Good afternoon':'Good evening';
+    const greetText = now.getHours() < 12 ? 'Good morning' : now.getHours() < 17 ? 'Good afternoon' : 'Good evening';
+    
+    // Create a list of module tiles
+    const modulesToDisplay = NAV.filter(n => n.id && n.id !== 'dashboard');
+
     return `
     <div class="dash-welcome">🌟 ${greetText}!</div>
-    <div class="dash-date text-muted">${now.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
+    <div class="dash-date text-muted">${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+    
     <div class="dash-grid">
-      <div class="dash-card" onclick="app.navigate('todo')"><div class="dash-card-icon">✅</div><div class="dash-card-val">${todos.length - completed}</div><div class="dash-card-label">Tasks Remaining</div></div>
-      <div class="dash-card" onclick="app.navigate('habits')"><div class="dash-card-icon">🔥</div><div class="dash-card-val">${activeHabits}</div><div class="dash-card-label">Active Streaks</div></div>
-      <div class="dash-card" onclick="app.navigate('notes')"><div class="dash-card-icon">📝</div><div class="dash-card-val">${notes.length}</div><div class="dash-card-label">Notes Saved</div></div>
-      <div class="dash-card" onclick="app.navigate('finance')"><div class="dash-card-icon">💰</div><div class="dash-card-val">$${(totalInc-totalExp).toFixed(0)}</div><div class="dash-card-label">Month Balance</div></div>
-      <div class="dash-card" onclick="app.navigate('todo')"><div class="dash-card-icon">🏆</div><div class="dash-card-val">${completed}</div><div class="dash-card-label">Tasks Done</div></div>
-      <div class="dash-card" onclick="app.navigate('goals')"><div class="dash-card-icon">🎯</div><div class="dash-card-val">${Storage.load('goals',[]).length}</div><div class="dash-card-label">Active Goals</div></div>
+      <div class="dash-card" onclick="app.navigate('todo')">
+        <div class="dash-card-icon">✅</div><div class="dash-card-val">${todos.filter(t => !t.done).length}</div><div class="dash-card-label">Tasks to do</div>
+      </div>
+      <div class="dash-card" onclick="app.navigate('notes')">
+        <div class="dash-card-icon">📝</div><div class="dash-card-val">${notes.length}</div><div class="dash-card-label">Notes saved</div>
+      </div>
+      <div class="dash-card" onclick="app.navigate('maps')">
+        <div class="dash-card-icon">📍</div><div class="dash-card-val">${Storage.load('waypoints', []).length}</div><div class="dash-card-label">Saved Places</div>
+      </div>
     </div>
-    <div class="section-title">Quick Actions</div>
-    <div class="flex gap-8 flex-wrap">
-      <button class="btn btn-primary" onclick="app.navigate('todo')">➕ Add Task</button>
-      <button class="btn btn-secondary" onclick="app.navigate('notes')">📝 New Note</button>
-      <button class="btn btn-secondary" onclick="app.navigate('clock')">⏱ Start Timer</button>
-      <button class="btn btn-secondary" onclick="app.navigate('finance')">💸 Log Expense</button>
-    </div>
-    <div class="card" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;margin-top:24px;">
+    <div class="card" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;margin:24px auto 24px auto;padding:20px;">
       <div class="card-title" style="color:#fff;margin-bottom:16px;">🎉 Get the Everall Desktop App</div>
       <div class="text-muted" style="color:rgba(255,255,255,0.9);margin-bottom:20px;">Take Everall with you everywhere. Download the official desktop application and boost your productivity on the go.</div>
-      <a href="https://github.com/Aarush-Kaushik/Everall/releases/download/v1.0.0/Everall.Setup.1.0.0.exe" class="btn btn-primary" style="background:#fff;color:#667eea;font-weight:bold;" download>⬇ Download Desktop App (v1.0.0)</a>
+      <a href="https://github.com/Aarush-Kaushik/Everall/releases/download/v1.0.0/Everall.Setup.1.0.0.exe" class="btn btn-primary" style="background:#fff;color:#667eea;font-weight:bold;" download>⬇ Download Desktop App</a>
+    </div>  
+    <div class="section-title">Quick Access</div>
+    <div class="quick-action-grid">
+      ${modulesToDisplay.map(m => `
+        <div class="action-tile" onclick="app.navigate('${m.id}')">
+          <div class="action-tile-icon">${m.icon}</div>
+          <div class="action-tile-label">${m.label}</div>
+          <div class="action-tile-desc">Open ${m.label} Module</div>
+        </div>
+      `).join('')}
     </div>`;
   },
   init() {}
+};
+
+// ══════════════════════════════════════════════════
+// MODULE: MAPS
+// ══════════════════════════════════════════════════
+const MapsModule = {
+  _map: null,
+  _satellite: false,
+  _layers: {},
+  _privacy: false,
+  _searchMarker: null,
+
+  render() {
+    return `
+    <div class="module-header">
+      <div class="map-search-wrap">
+        <span class="map-search-icon">🔍</span>
+        <input type="text" id="map-search-input" class="map-search-input" placeholder="Search for a city or address..." onkeyup="if(event.key==='Enter') MapsModule.search()">
+        <div id="map-search-status" class="text-xs text-muted mt-4" style="position:absolute; top:100%; left:8px;"></div>
+      </div>
+      <div class="flex gap-8">
+        <button id="map-coords-btn" class="btn btn-secondary" title="Copy Center Coordinates">📍 Copy Coords</button>
+        <button id="map-satellite-btn" class="btn ${this._satellite ? 'btn-primary' : 'btn-secondary'}">${this._satellite ? '🌙 Dark Mode' : '📡 Satellite'}</button>
+        <button id="map-privacy-btn" class="btn btn-secondary">🕵️ Privacy Mode</button>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0">
+      <div id="map-wrap" class="${this._privacy ? 'map-privacy-active' : ''}">
+        <div id="map"></div>
+        <div class="privacy-shutter-overlay">MAP PROTECTED FOR SCREENSHARING</div>
+      </div>
+    </div>
+    <div class="mt-16 text-muted text-sm">
+      💡 <b>Tip:</b> Use the search bar to find locations or toggle Satellite view for a high-res look.
+    </div>`;
+  },
+
+  init() {
+    if (this._map) {
+      this._map.remove();
+      this._map = null;
+    }
+    this._searchMarker = null;
+
+    this._map = L.map('map', { attributionControl: false }).setView([51.505, -0.09], 13);
+
+    this._layers.dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '',
+      subdomains: 'abcd',
+      maxZoom: 20
+    });
+
+    this._layers.satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: ''
+    });
+
+    if (this._satellite) {
+      this._layers.satellite.addTo(this._map);
+    } else {
+      this._layers.dark.addTo(this._map);
+    }
+
+    document.getElementById('map-satellite-btn')?.addEventListener('click', () => this.toggleSatellite());
+    document.getElementById('map-privacy-btn')?.addEventListener('click', () => this.togglePrivacy());
+    document.getElementById('map-coords-btn')?.addEventListener('click', () => this.copyCoords());
+
+    setTimeout(() => {
+      this._map.invalidateSize();
+      document.getElementById('map-search-input')?.focus();
+    }, 200);
+  },
+
+  copyCoords() {
+    const center = this._map.getCenter();
+    const coords = `${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}`;
+    navigator.clipboard.writeText(coords).then(() => {
+      showToast('Coordinates copied!', 'success');
+    });
+  },
+
+  toggleSatellite() {
+    this._satellite = !this._satellite;
+    const btn = document.getElementById('map-satellite-btn');
+    
+    if (this._satellite) {
+      if (this._map.hasLayer(this._layers.dark)) this._map.removeLayer(this._layers.dark);
+      this._layers.satellite.addTo(this._map);
+      if (btn) {
+        btn.innerHTML = '🌙 Dark Mode';
+        btn.classList.replace('btn-secondary', 'btn-primary');
+      }
+    } else {
+      if (this._map.hasLayer(this._layers.satellite)) this._map.removeLayer(this._layers.satellite);
+      this._layers.dark.addTo(this._map);
+      if (btn) {
+        btn.innerHTML = '📡 Satellite';
+        btn.classList.replace('btn-primary', 'btn-secondary');
+      }
+    }
+    showToast(this._satellite ? 'Satellite View Enabled' : 'Dark Mode Enabled');
+  },
+
+  async search() {
+    const query = document.getElementById('map-search-input')?.value;
+    if (!query) return;
+
+    const status = document.getElementById('map-search-status');
+    try {
+      if (status) status.textContent = 'Searching...';
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        const { lat, lon, display_name } = data[0];
+        const targetLat = parseFloat(lat);
+        const targetLon = parseFloat(lon);
+        
+        this._map.setView([targetLat, targetLon], 14);
+
+        // Marker Restoration logic
+        if (this._searchMarker) this._map.removeLayer(this._searchMarker);
+        this._searchMarker = L.marker([targetLat, targetLon]).addTo(this._map);
+        this._searchMarker.bindPopup(`<div style="font-weight:600; font-size:12px;">${display_name}</div>`).openPopup();
+
+        if (status) status.textContent = '';
+        showToast('Location found!', 'success');
+      } else {
+        if (status) status.textContent = 'Not found';
+        showToast('Location not found', 'error');
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+      if (status) status.textContent = 'Search failed';
+      showToast('Search failed (check internet connection)', 'error');
+    }
+  },
+
+  togglePrivacy() {
+    this._privacy = !this._privacy;
+    const wrap = document.getElementById('map-wrap');
+    if (wrap) wrap.classList.toggle('map-privacy-active', this._privacy);
+    showToast(this._privacy ? 'Privacy Mode Enabled' : 'Privacy Mode Disabled');
+  }
 };
 
 // ══════════════════════════════════════════════════
@@ -2423,6 +2669,803 @@ const UtilitiesModule = {
 };
 
 // ══════════════════════════════════════════════════
+// MODULE: CLIPBOARD MANAGER
+// ══════════════════════════════════════════════════
+const ClipboardModule = {
+  _history: [],
+  _maxItems: 50,
+  _lastClip: '',
+  _pollInterval: null,
+
+  render() {
+    const history = Storage.load('clipboard_history', []);
+    return `
+    <div class="module-header"><div><div class="module-title">📋 Clipboard Manager</div><div class="module-subtitle">Store and reuse clipboard items</div></div></div>
+
+    <div class="card">
+      <div class="card-title">Current Clipboard</div>
+      <div class="flex gap-8 flex-wrap" style="align-items: center;">
+        <button class="btn btn-primary" id="clipboard-add" title="Add current clipboard to history">➕ Add to History</button>
+        <button class="btn btn-secondary" id="clipboard-refresh" title="Refresh from clipboard">🔄 Refresh</button>
+        <span class="text-muted text-sm">Clipboard changes are captured when you add them</span>
+      </div>
+      <div id="clipboard-preview" class="mt-8" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;max-height:80px;overflow-y:auto;font-family:var(--mono);font-size:12px;color:var(--text2);white-space:pre-wrap;word-break:break-all;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">History (${history.length} items)</div>
+      <div id="clipboard-list" class="item-list" style="max-height:400px;overflow-y:auto;"></div>
+    </div>`;
+  },
+
+  init() {
+    clearInterval(this._pollInterval);
+    this._history = Storage.load('clipboard_history', []);
+    this.refreshPreview();
+    this.renderList();
+
+    document.getElementById('clipboard-add')?.addEventListener('click', () => this.addCurrent());
+    document.getElementById('clipboard-refresh')?.addEventListener('click', () => this.refreshPreview());
+
+    this._pollInterval = setInterval(() => this.refreshPreview(), 2000);
+  },
+
+  async refreshPreview() {
+    if (typeof app !== 'undefined' && app.currentModule !== 'clipboard') return;
+    try {
+      const el = document.getElementById('clipboard-preview');
+      if (!el) return;
+
+      // Check for image first
+      if (window.electronAPI?.readClipboardImage) {
+        const imgData = await window.electronAPI.readClipboardImage();
+        if (imgData) {
+          el.innerHTML = `<img src="${imgData}" style="max-height:60px;max-width:100%;border-radius:var(--radius-sm);border:1px solid var(--border);">`;
+          el.title = 'Image in clipboard';
+          return;
+        }
+      }
+
+      const text = window.electronAPI?.readClipboardText ? await window.electronAPI.readClipboardText() : await navigator.clipboard.readText();
+      el.textContent = text || '(empty)';
+      el.title = text ? text.slice(0, 200) : '';
+    } catch (_) {
+      const el = document.getElementById('clipboard-preview');
+      if (el) el.textContent = '(Clipboard access requires permission)';
+    }
+  },
+
+  async addCurrent() {
+    try {
+      // Check for image first
+      if (window.electronAPI && window.electronAPI.readClipboardImage) {
+        const imgData = await window.electronAPI.readClipboardImage();
+        if (imgData) {
+          // Check if this image is already the last one to avoid duplicates
+          if (imgData === this._lastClip) return;
+          this._lastClip = imgData;
+          this._history.unshift({ id: uid(), type: 'image', data: imgData, added: today() });
+          if (this._history.length > this._maxItems) this._history = this._history.slice(0, this._maxItems);
+          Storage.save('clipboard_history', this._history);
+          this.renderList();
+          const pEl = document.getElementById('clipboard-preview');
+          if (pEl) pEl.innerHTML = '';
+          showToast('Image added to clipboard history', 'success');
+          return;
+        }
+      }
+
+      const text = window.electronAPI?.readClipboardText ? await window.electronAPI.readClipboardText() : await navigator.clipboard.readText();
+      if (!text || text === this._lastClip) return;
+      this._lastClip = text;
+      this._history = this._history.filter((h, i) => h.text !== text);
+      this._history.unshift({ id: uid(), type: 'text', text, added: today() });
+      if (this._history.length > this._maxItems) this._history = this._history.slice(0, this._maxItems);
+      Storage.save('clipboard_history', this._history);
+      this.renderList();
+      const pEl = document.getElementById('clipboard-preview');
+      if (pEl) pEl.innerHTML = '';
+      showToast('Added to clipboard history', 'success');
+    } catch (e) {
+      showToast('Could not read clipboard', 'error');
+    }
+  },
+
+  copyToClipboard(item) {
+    if (item.type === 'image') {
+      if (window.electronAPI?.writeClipboardImage) {
+        window.electronAPI.writeClipboardImage(item.data);
+        showToast('Image copied to clipboard', 'success');
+      } else {
+        showToast('Image re-copying not supported in this environment', 'error');
+      }
+      return;
+    }
+    navigator.clipboard.writeText(item.text).then(() => showToast('Copied to clipboard', 'success')).catch(() => showToast('Copy failed', 'error'));
+  },
+
+  removeItem(id) {
+    this._history = this._history.filter(h => h.id !== id);
+    Storage.save('clipboard_history', this._history);
+    this.renderList();
+  },
+
+  renderList() {
+    const el = document.getElementById('clipboard-list');
+    if (!el) return;
+    if (!this._history.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div>No items in history. Copy something and click Add to History.</div>';
+      return;
+    }
+    el.innerHTML = this._history.map(h => {
+      if (h.type === 'image') {
+        return `
+        <div class="list-item" data-id="${escHtml(h.id)}">
+          <div style="flex:1;overflow:hidden;cursor:pointer;min-width:0;">
+            <img src="${h.data}" style="max-height:60px;max-width:100%;border-radius:var(--radius-sm);border:1px solid var(--border);">
+            <div class="text-muted text-sm">${escHtml(h.added)}</div>
+          </div>
+          <button class="btn btn-primary btn-sm clipboard-copy-btn">Copy</button>
+          <button class="btn btn-ghost btn-sm clipboard-remove-btn">✕</button>
+        </div>`;
+      }
+      const preview = escHtml(h.text?.slice(0, 80)) + (h.text?.length > 80 ? '…' : '');
+      return `
+      <div class="list-item" data-id="${escHtml(h.id)}">
+        <div class="clipboard-item-preview" style="flex:1;overflow:hidden;cursor:pointer;min-width:0;" title="${escHtml(h.text?.slice(0, 200))}">
+          <div style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${preview}</div>
+          <div class="text-muted text-sm">${escHtml(h.added)}</div>
+        </div>
+        <button class="btn btn-primary btn-sm clipboard-copy-btn">Copy</button>
+        <button class="btn btn-ghost btn-sm clipboard-remove-btn">✕</button>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('.clipboard-item-preview').forEach(div => {
+      div.addEventListener('click', () => {
+        const id = div.closest('.list-item')?.dataset?.id;
+        const item = this._history.find(x => x.id === id);
+        if (item) this.copyToClipboard(item);
+      });
+    });
+    el.querySelectorAll('.clipboard-copy-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.closest('.list-item')?.dataset?.id;
+        const item = this._history.find(x => x.id === id);
+        if (item) this.copyToClipboard(item);
+      });
+    });
+    el.querySelectorAll('.clipboard-remove-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.closest('.list-item')?.dataset?.id;
+        if (id) this.removeItem(id);
+      });
+    });
+  }
+};
+
+// ══════════════════════════════════════════════════
+// MODULE: CODE EDITOR
+// ══════════════════════════════════════════════════
+const CodeEditorModule = {
+  _content: '',
+  _path: null,
+  _lang: 'javascript',
+  _highlightTimer: null,
+
+  render() {
+    const langs = [
+      { id: 'javascript', label: 'JavaScript' },
+      { id: 'python', label: 'Python' },
+      { id: 'css', label: 'CSS' },
+      { id: 'json', label: 'JSON' },
+      { id: 'markup', label: 'HTML' },
+      { id: 'plain', label: 'Plain' },
+    ];
+    return `
+    <div class="module-header"><div><div class="module-title">📄 Code Editor</div><div class="module-subtitle">Edit and save code with syntax highlighting</div></div>
+    <div class="flex gap-8 flex-wrap">
+      <button class="btn btn-primary" id="code-open">📂 Open File</button>
+      <button class="btn btn-secondary" id="code-save">💾 Save</button>
+      <button class="btn btn-secondary" id="code-save-as">💾 Save As...</button>
+      <select id="code-lang" class="select" style="width:140px">
+        ${langs.map(l => `<option value="${l.id}">${l.label}</option>`).join('')}
+      </select>
+      <span id="code-path" class="text-muted text-sm" style="align-self:center;"></span>
+    </div></div>
+
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="card-title" style="margin:0;padding:12px 20px;border-bottom:1px solid var(--border);">Editor</div>
+      <div id="code-editor-wrap" style="position:relative;min-height:400px;">
+        <pre id="code-highlight" style="margin:0;padding:16px;font-family:var(--mono);font-size:13px;line-height:1.6;overflow:hidden;min-height:400px;background:var(--surface2);white-space:pre-wrap;word-wrap:break-word;box-sizing:border-box;"><code id="code-syntax" class="language-javascript" style="font-family:inherit;font-size:inherit;line-height:inherit;"></code></pre>
+        <textarea id="code-textarea" placeholder="Open a file or start typing..." style="position:absolute;top:0;left:0;right:0;bottom:0;width:100%;height:100%;margin:0;padding:16px;font-family:var(--mono);font-size:13px;line-height:1.6;resize:none;border:none;background:transparent;color:transparent;caret-color:var(--accent);outline:none;overflow:auto;box-sizing:border-box;white-space:pre-wrap;word-wrap:break-word;"></textarea>
+      </div>
+    </div>`;
+  },
+
+  init() {
+    if (typeof window.electronAPI === 'undefined') {
+      document.getElementById('code-path').textContent = '(File dialogs require Electron)';
+    }
+    const ta = document.getElementById('code-textarea');
+    const langSel = document.getElementById('code-lang');
+    if (!ta) return;
+
+    ta.addEventListener('input', () => {
+      this._content = ta.value;
+      this._isDirty = true;
+      window.electronAPI?.setDirty(true);
+      Storage.save('code_editor_content', { content: this._content, path: this._path });
+      this.debouncedHighlight();
+    });
+    ta.addEventListener('scroll', () => {
+      const pre = document.getElementById('code-highlight');
+      if (pre) {
+        pre.scrollTop = ta.scrollTop;
+        pre.scrollLeft = ta.scrollLeft;
+      }
+    });
+    langSel?.addEventListener('change', () => {
+      this._lang = langSel.value;
+      this.highlight();
+    });
+
+    document.getElementById('code-open')?.addEventListener('click', () => this.openFile());
+    document.getElementById('code-save')?.addEventListener('click', () => this.saveFile());
+    document.getElementById('code-save-as')?.addEventListener('click', () => this.saveFileAs());
+
+    // Load persisted content
+    const saved = Storage.load('code_editor_content', null);
+    if (saved) {
+      this._content = saved.content;
+      this._path = saved.path;
+      ta.value = this._content;
+      this._lang = this._extToLang(this._path);
+      if (langSel) langSel.value = this._lang;
+      document.getElementById('code-path').textContent = this._path ? this._path.split(/[/\\]/).pop() : '';
+      this.highlight();
+    }
+  },
+
+  debouncedHighlight() {
+    clearTimeout(this._highlightTimer);
+    this._highlightTimer = setTimeout(() => this.highlight(), 150);
+  },
+
+  highlight() {
+    const codeEl = document.getElementById('code-syntax');
+    const ta = document.getElementById('code-textarea');
+    if (!codeEl || !ta) return;
+    const text = (ta.value || '');
+    // Append a space or newline to ensure alignment at the end of the file
+    codeEl.textContent = text + (text.endsWith('\n') ? ' ' : '');
+    codeEl.className = this._lang === 'plain' ? '' : 'language-' + this._lang;
+    if (typeof Prism !== 'undefined' && this._lang !== 'plain') {
+      Prism.highlightElement(codeEl);
+    }
+    // Update scroll after highlight in case height changed
+    const pre = document.getElementById('code-highlight');
+    if (pre) {
+      pre.scrollTop = ta.scrollTop;
+      pre.scrollLeft = ta.scrollLeft;
+    }
+  },
+
+  _extToLang(path) {
+    const ext = (path || '').split('.').pop()?.toLowerCase();
+    const map = { js: 'javascript', mjs: 'javascript', ts: 'javascript', py: 'python', css: 'css', json: 'json', html: 'markup', htm: 'markup', xml: 'markup' };
+    return map[ext] || 'plain';
+  },
+
+  async openFile() {
+    if (typeof window.electronAPI === 'undefined') return showToast('File dialogs require Electron', 'error');
+    const result = await window.electronAPI.openFile();
+    if (!result) return;
+    if (result.error) return showToast('Read error: ' + result.error, 'error');
+    this._content = result.content;
+    this._path = result.path;
+    this._lang = this._extToLang(result.path);
+    const ta = document.getElementById('code-textarea');
+    const langSel = document.getElementById('code-lang');
+    if (ta) ta.value = result.content;
+    if (langSel) langSel.value = this._lang;
+    document.getElementById('code-path').textContent = result.path ? result.path.split(/[/\\]/).pop() : '';
+    this.highlight();
+    this._isDirty = false;
+    window.electronAPI?.setDirty(false);
+    Storage.save('code_editor_content', { content: this._content, path: this._path });
+    showToast('File loaded', 'success');
+  },
+
+  async saveFile() {
+    if (typeof window.electronAPI === 'undefined') return showToast('File dialogs require Electron', 'error');
+    const ta = document.getElementById('code-textarea');
+    const content = ta ? ta.value : this._content;
+    let result;
+    if (this._path) {
+      result = await window.electronAPI.saveFile(content, this._path);
+    } else {
+      result = await window.electronAPI.saveFileAs(content);
+    }
+    if (!result) return;
+    if (result.error) return showToast('Save error: ' + result.error, 'error');
+    this._path = result.path;
+    this._isDirty = false;
+    window.electronAPI?.setDirty(false);
+    document.getElementById('code-path').textContent = result.path ? result.path.split(/[/\\]/).pop() : '';
+    Storage.save('code_editor_content', { content: content, path: this._path });
+    showToast('Saved', 'success');
+  },
+
+  async saveFileAs() {
+    if (typeof window.electronAPI === 'undefined') return showToast('File dialogs require Electron', 'error');
+    const ta = document.getElementById('code-textarea');
+    const content = ta ? ta.value : this._content;
+    const result = await window.electronAPI.saveFileAs(content);
+    if (!result) return;
+    if (result.error) return showToast('Save error: ' + result.error, 'error');
+    this._path = result.path;
+    this._isDirty = false;
+    window.electronAPI?.setDirty(false);
+    document.getElementById('code-path').textContent = result.path ? result.path.split(/[/\\]/).pop() : '';
+    Storage.save('code_editor_content', { content: content, path: this._path });
+    showToast('Saved', 'success');
+  }
+};
+
+// ══════════════════════════════════════════════════
+// MODULE: MUSIC PLAYER
+// ══════════════════════════════════════════════════
+const MusicPlayerModule = {
+  _playlist: [],
+  _currentIndex: 0,
+  _audio: null,
+  _progressInterval: null,
+
+  render() {
+    return `
+    <div class="module-header"><div><div class="module-title">🎵 Music Player</div><div class="module-subtitle">Play your own audio files</div></div></div>
+
+    <div class="card">
+      <div class="card-title">Load Audio</div>
+      <div class="flex gap-8 flex-wrap" style="align-items: center;">
+        <input type="file" id="music-file-input" accept="audio/*" multiple style="display:none">
+        <button class="btn btn-primary" onclick="document.getElementById('music-file-input').click()">📂 Add Files</button>
+        <span id="music-file-count" class="text-muted text-sm">No files loaded</span>
+      </div>
+    </div>
+
+    <div class="card" id="music-player-card">
+      <div class="card-title" id="music-now-playing">Now Playing</div>
+      <audio id="music-audio" style="display:none"></audio>
+      <div id="music-visual" style="text-align:center;padding:24px;background:var(--surface2);border-radius:var(--radius);margin-bottom:16px;">
+        <div class="text-muted text-sm">Load audio files to start</div>
+      </div>
+      <div class="flex-between text-sm font-mono mb-8" style="color:var(--text2);">
+        <span id="music-time-current">0:00</span>
+        <span id="music-time-total">0:00</span>
+      </div>
+      <input type="range" id="music-progress" class="input" min="0" max="100" value="0" style="width:100%;height:6px;margin-bottom:12px;cursor:pointer;accent-color:var(--accent)">
+      <div class="flex gap-8 flex-wrap" style="justify-content:center;align-items:center;">
+        <button class="btn btn-secondary btn-icon" id="music-prev" title="Previous">⏮</button>
+        <button class="btn btn-primary btn-icon" style="width:48px;height:48px;font-size:20px;" id="music-play" title="Play/Pause">▶</button>
+        <button class="btn btn-secondary btn-icon" id="music-next" title="Next">⏭</button>
+        <div class="flex gap-8" style="align-items:center;">
+          <span class="text-muted text-sm">🔊</span>
+          <input type="range" id="music-volume" min="0" max="100" value="100" style="width:100px;height:4px;cursor:pointer;accent-color:var(--accent)">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="music-playlist-card">
+      <div class="card-title">Playlist</div>
+      <div id="music-playlist" class="item-list" style="max-height:240px;overflow-y:auto;"></div>
+    </div>`;
+  },
+
+  init() {
+    const fileInput = document.getElementById('music-file-input');
+    const audio = document.getElementById('music-audio');
+    if (!fileInput || !audio) return;
+
+    this._audio = audio;
+    const saved = Storage.load('music_playlist', { list: [], index: 0 });
+    this._playlist = saved.list;
+    this._currentIndex = saved.index;
+
+    fileInput.onchange = (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      files.forEach(f => {
+        if (f.type.startsWith('audio/')) {
+          this._playlist.push({ path: f.path, name: f.name });
+        }
+      });
+      fileInput.value = '';
+      Storage.save('music_playlist', { list: this._playlist, index: this._currentIndex });
+      this.renderPlaylist();
+      if (this._playlist.length && !this._audio.src) this.loadTrack(this._currentIndex);
+      showToast(`Added ${files.length} file(s)`, 'success');
+    };
+    
+    if (this._playlist.length) {
+      setTimeout(() => {
+        this.renderPlaylist();
+        this.loadTrack(this._currentIndex, false); // load but don't auto-play on init
+      }, 100);
+    }
+
+    document.getElementById('music-play')?.addEventListener('click', () => this.togglePlay());
+    document.getElementById('music-prev')?.addEventListener('click', () => this.prev());
+    document.getElementById('music-next')?.addEventListener('click', () => this.next());
+    document.getElementById('music-progress')?.addEventListener('input', (e) => this.seek(parseFloat(e.target.value)));
+    document.getElementById('music-volume')?.addEventListener('input', (e) => { audio.volume = e.target.value / 100; });
+
+    audio.addEventListener('timeupdate', () => this.updateProgress());
+    audio.addEventListener('loadedmetadata', () => this.updateTotal());
+    audio.addEventListener('ended', () => this.next());
+    audio.addEventListener('play', () => { const b = document.getElementById('music-play'); if (b) b.textContent = '⏸'; });
+    audio.addEventListener('pause', () => { const b = document.getElementById('music-play'); if (b) b.textContent = '▶'; });
+  },
+
+  async loadTrack(index, autoPlay = true) {
+    if (!this._playlist[index]) return;
+    if (this._audio.src) URL.revokeObjectURL(this._audio.src);
+    this._currentIndex = index;
+    Storage.save('music_playlist', { list: this._playlist, index: this._currentIndex });
+    const track = this._playlist[index];
+    
+    if (track.path && window.electronAPI?.getFileData) {
+      const dataUrl = await window.electronAPI.getFileData(track.path);
+      if (dataUrl) this._audio.src = dataUrl;
+      else showToast('Could not load file: ' + track.name, 'error');
+    } else if (track.file) {
+      this._audio.src = URL.createObjectURL(track.file);
+    }
+
+    this._audio.load();
+    document.getElementById('music-now-playing').textContent = 'Now Playing: ' + escHtml(track.name);
+    document.getElementById('music-visual').innerHTML = `<div style="font-size:48px;">🎵</div><div style="font-weight:600;margin-top:8px">${escHtml(track.name)}</div>`;
+    if (autoPlay) this._audio.play().catch(() => {});
+    this.renderPlaylist();
+  },
+
+  togglePlay() {
+    if (!this._playlist.length) return showToast('Load audio files first', 'error');
+    if (!this._audio.src) this.loadTrack(0);
+    const btn = document.getElementById('music-play');
+    if (this._audio.paused) {
+      this._audio.play();
+      btn.textContent = '⏸';
+    } else {
+      this._audio.pause();
+      btn.textContent = '▶';
+    }
+  },
+
+  prev() {
+    if (!this._playlist.length) return;
+    const next = this._currentIndex <= 0 ? this._playlist.length - 1 : this._currentIndex - 1;
+    this.loadTrack(next);
+  },
+
+  next() {
+    if (!this._playlist.length) return;
+    const next = (this._currentIndex + 1) % this._playlist.length;
+    this.loadTrack(next);
+  },
+
+  seek(percent) {
+    if (!this._audio.duration) return;
+    this._audio.currentTime = (percent / 100) * this._audio.duration;
+  },
+
+  updateProgress() {
+    const p = document.getElementById('music-progress');
+    const t = document.getElementById('music-time-current');
+    if (p && t && this._audio.duration) {
+      const pct = (this._audio.currentTime / this._audio.duration) * 100;
+      p.value = pct;
+      t.textContent = this._fmtTime(this._audio.currentTime);
+    }
+  },
+
+  updateTotal() {
+    const el = document.getElementById('music-time-total');
+    if (el && this._audio.duration) el.textContent = this._fmtTime(this._audio.duration);
+  },
+
+  _fmtTime(s) {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  },
+
+  renderPlaylist() {
+    const el = document.getElementById('music-playlist');
+    const countEl = document.getElementById('music-file-count');
+    if (!el) return;
+    if (!this._playlist.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🎵</div>No tracks in playlist</div>';
+      if (countEl) countEl.textContent = 'No files loaded';
+      return;
+    }
+    if (countEl) countEl.textContent = `${this._playlist.length} track(s)`;
+    el.innerHTML = this._playlist.map((t, i) => `
+      <div class="list-item ${i === this._currentIndex ? 'active' : ''}" style="cursor:pointer" data-index="${i}">
+        <span>${i + 1}.</span>
+        <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(t.name)}</div>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();MusicPlayerModule.removeTrack(${i})">✕</button>
+      </div>
+    `).join('');
+    el.querySelectorAll('.list-item').forEach(item => {
+      item.addEventListener('click', () => this.loadTrack(parseInt(item.dataset.index)));
+    });
+  },
+
+  removeTrack(i) {
+    const wasCurrent = (i === this._currentIndex);
+    const audio = this._audio;
+    if (wasCurrent && audio) {
+      audio.pause();
+      if (audio.src) {
+        try { URL.revokeObjectURL(audio.src); } catch (_) {}
+        audio.removeAttribute('src');
+        audio.load();
+      }
+      const btn = document.getElementById('music-play');
+      if (btn) btn.textContent = '▶';
+    }
+    this._playlist.splice(i, 1);
+    Storage.save('music_playlist', { list: this._playlist, index: this._currentIndex });
+    if (this._playlist.length === 0) {
+      this._currentIndex = 0;
+      if (wasCurrent) {
+        document.getElementById('music-now-playing').textContent = 'Now Playing';
+        document.getElementById('music-visual').innerHTML = '<div class="text-muted text-sm">Load audio files to start</div>';
+        document.getElementById('music-time-current').textContent = '0:00';
+        document.getElementById('music-time-total').textContent = '0:00';
+        const p = document.getElementById('music-progress');
+        if (p) p.value = 0;
+      }
+      this.renderPlaylist();
+      return;
+    }
+    if (i < this._currentIndex) this._currentIndex--;
+    else if (wasCurrent) {
+      if (this._currentIndex >= this._playlist.length) this._currentIndex = this._playlist.length - 1;
+      this.loadTrack(this._currentIndex);
+    }
+    this.renderPlaylist();
+  }
+};
+
+// ══════════════════════════════════════════════════
+// MODULE: VIDEO PLAYER
+// ══════════════════════════════════════════════════
+const VideoPlayerModule = {
+  _playlist: [],
+  _currentIndex: 0,
+
+  render() {
+    return `
+    <div class="module-header"><div><div class="module-title">🎬 Video Player</div><div class="module-subtitle">Play your own video files</div></div></div>
+
+    <div class="card">
+      <div class="card-title">Load Video</div>
+      <div class="flex gap-8 flex-wrap" style="align-items: center;">
+        <input type="file" id="video-file-input" accept="video/*" multiple style="display:none">
+        <button class="btn btn-primary" onclick="document.getElementById('video-file-input').click()">📂 Add Files</button>
+        <span id="video-file-count" class="text-muted text-sm">No files loaded</span>
+      </div>
+    </div>
+
+    <div class="card" id="video-player-card">
+      <div class="card-title" id="video-now-playing">Now Playing</div>
+      <video id="video-element" style="width:100%;max-height:400px;background:#000;border-radius:var(--radius);"></video>
+      <div class="flex-between text-sm font-mono mt-8" style="color:var(--text2);">
+        <span id="video-time-current">0:00</span>
+        <span id="video-time-total">0:00</span>
+      </div>
+      <input type="range" id="video-progress" class="input" min="0" max="100" value="0" style="width:100%;height:6px;margin:8px 0;cursor:pointer;accent-color:var(--accent)">
+      <div class="flex gap-8 flex-wrap mt-8" style="align-items:center;">
+        <button class="btn btn-secondary btn-icon" id="video-prev" title="Previous">⏮</button>
+        <button class="btn btn-primary btn-icon" id="video-play" title="Play/Pause">▶</button>
+        <button class="btn btn-secondary btn-icon" id="video-next" title="Next">⏭</button>
+        <div class="flex gap-8" style="align-items:center;">
+          <span class="text-muted text-sm">🔊</span>
+          <input type="range" id="video-volume" min="0" max="100" value="100" style="width:100px;height:4px;cursor:pointer;accent-color:var(--accent)">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="video-playlist-card">
+      <div class="card-title">Playlist</div>
+      <div id="video-playlist" class="item-list" style="max-height:200px;overflow-y:auto;"></div>
+    </div>`;
+  },
+
+  init() {
+    const fileInput = document.getElementById('video-file-input');
+    const video = document.getElementById('video-element');
+    if (!fileInput || !video) return;
+
+    const saved = Storage.load('video_playlist', { list: [], index: 0 });
+    this._playlist = saved.list;
+    this._currentIndex = saved.index;
+
+    fileInput.onchange = (e) => {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      files.forEach(f => {
+        if (f.type.startsWith('video/')) {
+          this._playlist.push({ path: f.path, name: f.name });
+        }
+      });
+      fileInput.value = '';
+      Storage.save('video_playlist', { list: this._playlist, index: this._currentIndex });
+      this.renderPlaylist();
+      if (this._playlist.length && !video.src) this.loadTrack(this._currentIndex);
+      showToast(`Added ${files.length} file(s)`, 'success');
+    };
+
+    if (this._playlist.length) {
+      setTimeout(() => {
+        this.renderPlaylist();
+        this.loadTrack(this._currentIndex, false);
+      }, 100);
+    }
+
+    document.getElementById('video-play')?.addEventListener('click', () => this.togglePlay());
+    document.getElementById('video-prev')?.addEventListener('click', () => this.prev());
+    document.getElementById('video-next')?.addEventListener('click', () => this.next());
+    document.getElementById('video-progress')?.addEventListener('input', (e) => this.seek(parseFloat(e.target.value)));
+    document.getElementById('video-volume')?.addEventListener('input', (e) => { video.volume = e.target.value / 100; });
+
+    video.addEventListener('timeupdate', () => this.updateProgress());
+    video.addEventListener('loadedmetadata', () => this.updateTotal());
+    video.addEventListener('ended', () => this.next());
+    video.addEventListener('play', () => { const b = document.getElementById('video-play'); if (b) b.textContent = '⏸'; });
+    video.addEventListener('pause', () => { const b = document.getElementById('video-play'); if (b) b.textContent = '▶'; });
+  },
+
+  async loadTrack(index, autoPlay = true) {
+    if (!this._playlist[index]) return;
+    const video = document.getElementById('video-element');
+    if (video.src) URL.revokeObjectURL(video.src);
+    this._currentIndex = index;
+    Storage.save('video_playlist', { list: this._playlist, index: this._currentIndex });
+    const track = this._playlist[index];
+    
+    if (track.path && window.electronAPI?.getFileData) {
+      const dataUrl = await window.electronAPI.getFileData(track.path);
+      if (dataUrl) video.src = dataUrl;
+      else showToast('Could not load file: ' + track.name, 'error');
+    } else if (track.file) {
+      video.src = URL.createObjectURL(track.file);
+    }
+
+    video.load();
+    document.getElementById('video-now-playing').textContent = 'Now Playing: ' + escHtml(track.name);
+    if (autoPlay) video.play().catch(() => {});
+    this.renderPlaylist();
+  },
+
+  togglePlay() {
+    const video = document.getElementById('video-element');
+    if (!this._playlist.length) return showToast('Load video files first', 'error');
+    if (!video.src) this.loadTrack(0);
+    const btn = document.getElementById('video-play');
+    if (video.paused) {
+      video.play();
+      btn.textContent = '⏸';
+    } else {
+      video.pause();
+      btn.textContent = '▶';
+    }
+  },
+
+  prev() {
+    if (!this._playlist.length) return;
+    const next = this._currentIndex <= 0 ? this._playlist.length - 1 : this._currentIndex - 1;
+    this.loadTrack(next);
+  },
+
+  next() {
+    if (!this._playlist.length) return;
+    const next = (this._currentIndex + 1) % this._playlist.length;
+    this.loadTrack(next);
+  },
+
+  seek(percent) {
+    const video = document.getElementById('video-element');
+    if (!video.duration) return;
+    video.currentTime = (percent / 100) * video.duration;
+  },
+
+  updateProgress() {
+    const video = document.getElementById('video-element');
+    const p = document.getElementById('video-progress');
+    const t = document.getElementById('video-time-current');
+    if (p && t && video.duration) {
+      const pct = (video.currentTime / video.duration) * 100;
+      p.value = pct;
+      t.textContent = this._fmtTime(video.currentTime);
+    }
+  },
+
+  updateTotal() {
+    const video = document.getElementById('video-element');
+    const el = document.getElementById('video-time-total');
+    if (el && video.duration) el.textContent = this._fmtTime(video.duration);
+  },
+
+  _fmtTime(s) {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  },
+
+  renderPlaylist() {
+    const el = document.getElementById('video-playlist');
+    const countEl = document.getElementById('video-file-count');
+    if (!el) return;
+    if (!this._playlist.length) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🎬</div>No videos in playlist</div>';
+      if (countEl) countEl.textContent = 'No files loaded';
+      return;
+    }
+    if (countEl) countEl.textContent = `${this._playlist.length} video(s)`;
+    el.innerHTML = this._playlist.map((t, i) => `
+      <div class="list-item ${i === this._currentIndex ? 'active' : ''}" style="cursor:pointer" data-index="${i}">
+        <span>${i + 1}.</span>
+        <div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(t.name)}</div>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();VideoPlayerModule.removeTrack(${i})">✕</button>
+      </div>
+    `).join('');
+    el.querySelectorAll('.list-item').forEach(item => {
+      item.addEventListener('click', () => this.loadTrack(parseInt(item.dataset.index)));
+    });
+  },
+
+  removeTrack(i) {
+    const wasCurrent = (i === this._currentIndex);
+    const video = document.getElementById('video-element');
+    if (wasCurrent && video) {
+      video.pause();
+      if (video.src) {
+        try { URL.revokeObjectURL(video.src); } catch (_) {}
+        video.removeAttribute('src');
+        video.load();
+      }
+      const btn = document.getElementById('video-play');
+      if (btn) btn.textContent = '▶';
+    }
+    this._playlist.splice(i, 1);
+    Storage.save('video_playlist', { list: this._playlist, index: this._currentIndex });
+    if (this._playlist.length === 0) {
+      this._currentIndex = 0;
+      if (wasCurrent && video) {
+        document.getElementById('video-now-playing').textContent = 'Now Playing';
+        document.getElementById('video-time-current').textContent = '0:00';
+        document.getElementById('video-time-total').textContent = '0:00';
+        const p = document.getElementById('video-progress');
+        if (p) p.value = 0;
+      }
+      this.renderPlaylist();
+      return;
+    }
+    if (i < this._currentIndex) this._currentIndex--;
+    else if (wasCurrent) {
+      if (this._currentIndex >= this._playlist.length) this._currentIndex = this._playlist.length - 1;
+      this.loadTrack(this._currentIndex);
+    }
+    this.renderPlaylist();
+  }
+};
+
+// ══════════════════════════════════════════════════
 // MODULE: SETTINGS
 // ══════════════════════════════════════════════════
 const SettingsModule = {
@@ -2484,7 +3527,7 @@ const SettingsModule = {
     </div>
     <div class="card">
       <div class="card-title">About Everall</div>
-      <div class="settings-row"><div class="settings-label">Version</div><span class="font-mono text-accent">1.1.0</span></div>
+      <div class="settings-row"><div class="settings-label">Version</div><span class="font-mono text-accent">1.2.0</span></div>
       <div class="settings-row"><div class="settings-label">Storage Used</div><span id="storage-size" class="font-mono">${this.storageSize()}</span></div>
       <div class="settings-row"><div class="settings-label">Mode</div><span class="badge badge-green">Fully Offline</span></div>
     </div>`;
@@ -3134,13 +4177,18 @@ const Modules = {
   health:     HealthModule,
   games:      GamesModule,
   dailychallenge: DailyChallengeModule,
+  music:      MusicPlayerModule,
+  video:      VideoPlayerModule,
   contacts:   ContactsModule,
   analytics:  AnalyticsModule,
-  utilities:  UtilitiesModule,
-  settings:   SettingsModule,
-  about:      AboutModule,
+  utilities:   UtilitiesModule,
+  clipboard:   ClipboardModule,
+  codeeditor:  CodeEditorModule,
+  maps:        MapsModule,
+  settings:    SettingsModule,
+  about:       AboutModule,
   instructions: InstructionsModule,
-  keybinds:   KeybindsModule,
+  keybinds:    KeybindsModule,
 };
 
 // ══════════════════════════════════════════════════
@@ -3164,14 +4212,19 @@ document.addEventListener('DOMContentLoaded', () => {
   window.GamesModule = GamesModule;
   window.AnalyticsModule = AnalyticsModule;
   window.UtilitiesModule = UtilitiesModule;
+  window.ClipboardModule = ClipboardModule;
+  window.CodeEditorModule = CodeEditorModule;
   window.SettingsModule = SettingsModule;
   window.AboutModule = AboutModule;
   window.InstructionsModule = InstructionsModule;
   window.ContactsModule = ContactsModule;
   window.MealPlannerModule = MealPlannerModule;
   window.DailyChallengeModule = DailyChallengeModule;
+  window.MusicPlayerModule = MusicPlayerModule;
+  window.VideoPlayerModule = VideoPlayerModule;
   window.WeeklyReviewModule = WeeklyReviewModule;
   window.KeybindsModule = KeybindsModule;
+  window.MapsModule = MapsModule;
   window.showToast = showToast;
   window.closeModal = closeModal;
   window.openModal = openModal;

@@ -310,6 +310,11 @@ const DashboardModule = {
       <button class="btn btn-secondary" onclick="app.navigate('notes')">📝 New Note</button>
       <button class="btn btn-secondary" onclick="app.navigate('clock')">⏱ Start Timer</button>
       <button class="btn btn-secondary" onclick="app.navigate('finance')">💸 Log Expense</button>
+    </div>
+    <div class="card" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;margin-top:24px;">
+      <div class="card-title" style="color:#fff;margin-bottom:16px;">🎉 Get the Everall Desktop App</div>
+      <div class="text-muted" style="color:rgba(255,255,255,0.9);margin-bottom:20px;">Take Everall with you everywhere. Download the official desktop application and boost your productivity on the go.</div>
+      <a href="https://github.com/Aarush-Kaushik/Everall/releases/download/v1.0.0/Everall.Setup.1.0.0.exe" class="btn btn-primary" style="background:#fff;color:#667eea;font-weight:bold;" download>⬇ Download Desktop App (v1.0.0)</a>
     </div>`;
   },
   init() {}

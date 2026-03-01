@@ -2564,7 +2564,7 @@ const AboutModule = {
     <div class="card">
       <div class="card-title">About the Developer</div>
       <p style="line-height: 1.8; color: var(--text2); margin-bottom: 8px;">
-        <strong>Developed by Aarush Kaushik</strong>
+        <strong>Developed by Pawaaru Solutions</strong>
       </p>
       <p style="line-height: 1.8; color: var(--text2); margin-bottom: 16px;">
         Everall combines functionality, modern design, and ease of use, giving you a truly unified experience that replaces juggling multiple programs with a single, powerful hub.

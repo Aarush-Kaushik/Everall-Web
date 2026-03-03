@@ -77,13 +77,14 @@ const NAV = [
   { id: 'health',       label: 'Health',        icon: '💪', key: 'E' },
   { section: 'Fun' },
   { id: 'games',        label: 'Games',         icon: '🎮', key: 'X' },
-  { id: 'dailychallenge', label: 'Daily Challenge', icon: '🎁', key: 'P' },
+  { id: 'dailychallenge', label: 'Daily Challenge', icon: '🎁', key: '+' },
   { section: 'Media' },
   { id: 'music',        label: 'Music Player',  icon: '🎵', key: 'Q' },
   { id: 'video',        label: 'Video Player',  icon: '🎬', key: 'B' },
+  { id: 'youtubedownloader', label: 'YouTube Downloader', icon: '▼', key: '\\' },
   { id: 'maps',         label: 'Maps',          icon: '🗺️', key: 'O' },
   { section: 'People' },
-  { id: 'contacts',     label: 'Contacts',      icon: '👥', key: 'P' },
+  { id: 'contacts',     label: 'Contacts',      icon: '👥', key: '[' },
   { section: 'Tools' },
   { id: 'utilities',    label: 'Utilities',     icon: '🔧', key: 'U' },
   { id: 'clipboard',    label: 'Clipboard',     icon: '📋', key: 'J' },
@@ -403,8 +404,8 @@ const DashboardModule = {
         <div class="dash-card-icon">📍</div><div class="dash-card-val">${Storage.load('waypoints', []).length}</div><div class="dash-card-label">Saved Places</div>
       </div>
     </div>
+
     <div class="section-title">Quick Access</div>
-    
     <div class="quick-action-grid">
       ${modulesToDisplay.map(m => `
         <div class="action-tile" onclick="app.navigate('${m.id}')">
@@ -414,12 +415,16 @@ const DashboardModule = {
         </div>
       `).join('')}
     </div>
-    <div class="card" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;margin:24px auto 24px auto;padding:20px;">
-      <div class="card-title" style="color:#fff;margin-bottom:16px;">🎉 Get the Everall Desktop App</div>
-      <div class="text-muted" style="color:rgba(255,255,255,0.9);margin-bottom:20px;">Take Everall with you everywhere. Download the official desktop application and boost your productivity on the go.</div>
-      <a href="https://github.com/Aarush-Kaushik/Everall/releases/download/v1.0.0/Everall.Setup.1.0.0.exe" class="btn btn-primary" style="background:#fff;color:#667eea;font-weight:bold;" download>⬇ Download Desktop App</a>
+    <div class="card" style="text-align: center; padding: 40px; background: linear-gradient(135deg, var(--surface2) 0%, var(--surface1) 100%); border: 2px solid var(--accent); margin-top: 24px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">🎉</div>
+      <div style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: var(--text);">Get the Everall Desktop App</div>
+      <div style="font-size: 14px; color: var(--text2); line-height: 1.6; margin-bottom: 20px; max-width: 400px; margin-left: auto; margin-right: auto;">
+        Take Everall with you everywhere. Download the official desktop application and unlock the full potential of Everall! (Windows only)
+      </div>
+      <a href="https://github.com/Aarush-Kaushik/Everall/releases/download/v1.0.0/Everall.Setup.1.0.0.exe" target="_blank" style="display: inline-block; padding: 12px 24px; background: var(--accent); color: white; border-radius: var(--radius-sm); text-decoration: none; font-weight: 600; cursor: pointer; border: none; transition: all 0.3s;">
+        ⬇️ Download Desktop App
+      </a>
     </div>`;
-    
   },
   init() {}
 };
@@ -3529,7 +3534,7 @@ const SettingsModule = {
     </div>
     <div class="card">
       <div class="card-title">About Everall</div>
-      <div class="settings-row"><div class="settings-label">Version</div><span class="font-mono text-accent">1.2.0</span></div>
+      <div class="settings-row"><div class="settings-label">Version</div><span class="font-mono text-accent">1.2.2</span></div>
       <div class="settings-row"><div class="settings-label">Storage Used</div><span id="storage-size" class="font-mono">${this.storageSize()}</span></div>
       <div class="settings-row"><div class="settings-label">Mode</div><span class="badge badge-green">Fully Offline</span></div>
     </div>`;
@@ -4115,6 +4120,42 @@ const WeeklyReviewModule = {
 };
 
 // ══════════════════════════════════════════════════
+// MODULE: YOUTUBE DOWNLOADER
+// ══════════════════════════════════════════════════
+const YoutubeDownloaderModule = {
+  
+  render() {
+    return `
+    <div class="module-header"><div><div class="module-title">▼ YouTube Downloader</div><div class="module-subtitle">Download YouTube videos</div></div></div>
+    
+    <div class="card" style="text-align: center; padding: 40px; background: linear-gradient(135deg, var(--surface2) 0%, var(--surface1) 100%); border: 2px solid var(--accent);">
+      <div style="font-size: 48px; margin-bottom: 16px;">📥</div>
+      <div style="font-size: 20px; font-weight: 600; margin-bottom: 12px; color: var(--text);">Coming Soon</div>
+      <div style="font-size: 14px; color: var(--text2); line-height: 1.6; margin-bottom: 20px;">
+        Currently only available on the <strong>Everall Software</strong>.<br>Please download Everall to use this module! (Windows only)
+      </div>
+      <a href="https://github.com/Aarush-Kaushik/Everall/releases/download/v1.0.0/Everall.Setup.1.0.0.exe" target="_blank" style="display: inline-block; padding: 12px 24px; background: var(--accent); color: white; border-radius: var(--radius-sm); text-decoration: none; font-weight: 600; cursor: pointer; border: none;">
+        ⬇️ Download Everall
+      </a>
+    </div>
+    
+    <div class="card">
+      <div class="card-title">✨ Features</div>
+      <ul style="list-style: none; color: var(--text2); font-size: 13px; line-height: 1.8;">
+        <li style="margin-bottom: 8px;">✓ Download YouTube videos in MP4 format</li>
+        <li style="margin-bottom: 8px;">✓ Extract audio as MP3</li>
+        <li style="margin-bottom: 8px;">✓ Custom download location</li>
+        <li style="margin-bottom: 8px;">✓ Download history tracking</li>
+        <li>✓ Real-time progress monitoring</li>
+      </ul>
+    </div>
+    `;
+  },
+
+  init() {}
+};
+
+// ══════════════════════════════════════════════════
 // MODULE: KEYBINDS
 // ══════════════════════════════════════════════════
 const KeybindsModule = {
@@ -4181,6 +4222,7 @@ const Modules = {
   dailychallenge: DailyChallengeModule,
   music:      MusicPlayerModule,
   video:      VideoPlayerModule,
+  youtubedownloader: YoutubeDownloaderModule,
   contacts:   ContactsModule,
   analytics:  AnalyticsModule,
   utilities:   UtilitiesModule,
@@ -4230,4 +4272,5 @@ document.addEventListener('DOMContentLoaded', () => {
   window.showToast = showToast;
   window.closeModal = closeModal;
   window.openModal = openModal;
+  window.YoutubeDownloaderModule = YoutubeDownloaderModule;
 });
